@@ -44,8 +44,9 @@ jobs:
     steps:
       - name: Test
         run: |
-          set -xeu
-          find / -name 'api-ms-win-*'
+          set -x
+          find /c/ -name 'api-ms-win-*'
+          wmic logicaldisk get name
       
       # - name: Checkout yt-dlp
       #   uses: actions/checkout@v4
