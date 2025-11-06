@@ -1,0 +1,114 @@
+name: build
+
+on:
+  workflow_dispatch:
+    inputs:
+      yt_dlp_ref:
+        description: "yt-dlp version to build (YYYY.MM.DD)"
+        required: true
+        type: string
+      allow_update:
+        description: "Allow --update to work"
+        default: true
+        type: boolean
+      python_ver:
+        description: "Python version to use from 3dyd/cpython"
+        default: 3.12.11
+        type: string
+      pyi_build_owner:
+        description: "PyInstaller build repository owner"
+        default: 3dyd
+        type: string
+      pyi_build_repo:
+        description: "PyInstaller build repository name"
+        default: pyinstaller-builds
+        type: string
+      pyi_ver:
+        description: "PyInstaller version to build"
+        default: 6.16.0
+        type: string
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    name: build
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Test
+        run: |
+          set -xeu
+          find / -name 'api-ms-win-*'
+      
+      # - name: Checkout yt-dlp
+      #   uses: actions/checkout@v4
+      #   with:
+      #     repository: yt-dlp/yt-dlp
+      #     path: yt-dlp
+      #     ref: ${{ inputs.yt_dlp_ref }}
+
+      # - name: Setup Python
+      #   run: |
+      #     set -xeu
+      #     curl -L https://github.com/3dyd/cpython/releases/download/v${PYTHON_VER}-vista/python-${PYTHON_VER}-pip+venv-win32-VISTA.zip -o python.zip
+      #     unzip -q python.zip -d python
+      #     python/python.exe -m venv venv
+      #   env:
+      #     PYTHON_VER: ${{ inputs.python_ver }}
+
+      # - name: Install Dependencies
+      #   run: |
+      #     set -xeu
+      #     source venv/Scripts/activate
+      #     python yt-dlp/devscripts/install_deps.py --include build
+      #     python -m pip install https://${PYI_BUILD_OWNER}.github.io/${PYI_BUILD_REPO}/vista/pyinstaller-${PYI_VER}-py3-none-any.whl
+      #   env:
+      #     PYI_BUILD_OWNER: ${{ inputs.pyi_build_owner }}
+      #     PYI_BUILD_REPO: ${{ inputs.pyi_build_repo }}
+      #     PYI_VER: ${{ inputs.pyi_ver }}
+
+      # - name: Build Files
+      #   run: |
+      #     set -xeu
+      #     source venv/Scripts/activate
+      #     cd yt-dlp
+      #     python devscripts/make_lazy_extractors.py
+
+      #     if [[ "$ALLOW_UPDATE" == "true" ]]; then
+      #       sed -ri "s,ORIGIN.+,ORIGIN = '$GITHUB_REPOSITORY'," yt_dlp/version.py
+
+      #       grep -Fqx "    'stable': 'yt-dlp/yt-dlp'," yt_dlp/update.py  # ensure it has this line
+      #       sed -i "s|^    'stable': 'yt-dlp/yt-dlp',$|    'stable': '$GITHUB_REPOSITORY',|" yt_dlp/update.py
+
+      #       mkdir dist
+      #       echo "# This file is used for regulating self-update" > dist/_update_spec
+
+      #     else
+      #       python devscripts/set-variant.py other
+      #     fi
+
+      #     python -m bundle.pyinstaller
+
+      #     (cd dist && sha256sum yt-dlp_x86.exe > SHA2-256SUMS)
+      #   env:
+      #     ALLOW_UPDATE: ${{ inputs.allow_update }}
+
+      # - name: Release Files
+      #   run: |
+      #     set -xeu
+      #     if gh --repo "$GITHUB_REPOSITORY" release view "$YT_DLP_REF" &> /dev/null; then
+      #       gh --repo "$GITHUB_REPOSITORY" release delete --cleanup-tag --yes "$YT_DLP_REF"
+      #       sleep 10
+      #     fi
+      #     NOTES="Read changelog on the official release page: https://github.com/yt-dlp/yt-dlp/releases/tag/$YT_DLP_REF"
+      #     gh --repo "$GITHUB_REPOSITORY" release create "$YT_DLP_REF" --target master --title "yt-dlp $YT_DLP_REF" --notes "$NOTES" yt-dlp/dist/*
+      #   env:
+      #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #     YT_DLP_REF: ${{ inputs.yt_dlp_ref }}
