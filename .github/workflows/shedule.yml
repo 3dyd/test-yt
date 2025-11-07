@@ -32,7 +32,8 @@ jobs:
   build:
     needs: prepare
     if: needs.prepare.outputs.skip_build != 'true'
-    uses: 3dyd/yt-dlp-builds/.github/workflows/build.yml@master
+    # uses: 3dyd/yt-dlp-builds/.github/workflows/build.yml@master
+    uses: 3dyd/test-yt/.github/workflows/build.yml@master
     with:
       yt_dlp_ref: ${{ needs.prepare.outputs.yt_dlp_ref }}
       yt_dlp_version: ${{ needs.prepare.outputs.yt_dlp_version }}
