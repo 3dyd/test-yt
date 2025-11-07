@@ -98,7 +98,7 @@ jobs:
         run: |
           set -xeu
           curl -L https://github.com/3dyd/cpython/releases/download/v${PYTHON_VER}-vista/python-${PYTHON_VER}-pip+venv-win32-VISTA.zip -o .python.zip
-          unzip -q python.zip -d .python
+          unzip -q .python.zip -d .python
           python/python.exe -m venv .venv
         env:
           PYTHON_VER: ${{ inputs.python_ver }}
