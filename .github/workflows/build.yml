@@ -176,10 +176,10 @@ jobs:
           fi
           if [[ "$CURRENT_CHANNEL" == "stable" ]]; then
             title="yt-dlp $YT_DLP_VERSION"
-            notes="Read changelog on the official release page: [yt-dlp/yt-dlp@`$YT_DLP_REF`](https://github.com/yt-dlp/yt-dlp/releases/tag/$YT_DLP_REF)"
+            notes="Read changelog on the official release page: [yt-dlp/yt-dlp@\`$YT_DLP_REF\`](https://github.com/yt-dlp/yt-dlp/releases/tag/$YT_DLP_REF)"
           else
             title="yt-dlp $CURRENT_CHANNEL $YT_DLP_VERSION"
-            notes="Generated from: [yt-dlp/yt-dlp@`${YT_DLP_REF:0:8}`](https://github.com/yt-dlp/yt-dlp/commit/$YT_DLP_REF)"
+            notes="Generated from: [yt-dlp/yt-dlp@\`${YT_DLP_REF:0:8}\`](https://github.com/yt-dlp/yt-dlp/commit/$YT_DLP_REF)"
           fi
           gh --repo "$GITHUB_REPOSITORY" release create "$YT_DLP_VERSION" --target master --title "$title" --notes "$notes" yt-dlp/dist/*
         env:
