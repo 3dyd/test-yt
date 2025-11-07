@@ -3,10 +3,8 @@ name: schedule
 on:
   workflow_dispatch:
 
-# permissions:
-#   contents: write
-#   pages: write
-#   id-token: write
+  schedule:
+    - cron: '42 23 * * *'  # daily at 23:42 UTC
 
 jobs:
   prepare:
@@ -21,19 +19,29 @@ jobs:
       yt_dlp_version: ${{ steps.generate-outputs.outputs.yt_dlp_version }}
 
     steps:
+      - name: Checkout yt-dlp
+        uses: actions/checkout@v4
+        with:
+          repository: yt-dlp/yt-dlp
+
       - name: Generate Outputs
         id: generate-outputs
         run: |
           set -xeu
-          echo "yt_dlp_version=$(date +"%Y.%m.%d")" >> $GITHUB_OUTPUT
-          echo "yt_dlp_ref=8636a9bac3bed99984c1e297453660468ecf504b" >> $GITHUB_OUTPUT
-          echo "skip_build=false" >> $GITHUB_OUTPUT
+
+          commit_date="$(git log -1 --format=%cd --date=format:'%Y.%m.%d')"
+          current_date="$(date +"%Y.%m.%d")"
+          skip_build="false"
+          [[ "$commit_date" == "$current_date" ]] || skip_build="true"
+
+          echo "yt_dlp_version=$current_date" >> $GITHUB_OUTPUT
+          echo "yt_dlp_ref=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+          echo "skip_build=$skip_build" >> $GITHUB_OUTPUT
 
   build:
     needs: prepare
     if: needs.prepare.outputs.skip_build != 'true'
-    # uses: 3dyd/yt-dlp-builds/.github/workflows/build.yml@master
-    uses: 3dyd/test-yt/.github/workflows/build.yml@master
+    uses: 3dyd/yt-dlp-builds/.github/workflows/build.yml@master
     with:
       yt_dlp_ref: ${{ needs.prepare.outputs.yt_dlp_ref }}
       yt_dlp_version: ${{ needs.prepare.outputs.yt_dlp_version }}
