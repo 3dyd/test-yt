@@ -1,0 +1,186 @@
+name: build
+
+on:
+  workflow_dispatch:
+    inputs:
+      yt_dlp_ref:
+        description: "yt-dlp ref to checkout: tag YYYY.MM.DD for stable channel or hash for other channels"
+        required: true
+        type: string
+      yt_dlp_version:
+        description: "yt-dlp version (YYYY.MM.DD)"
+        required: true
+        type: string
+      current_update_channel:
+        description: "Current yt-dlp update channel"
+        default: stable
+        type: string
+      other_update_channels_spec:
+        description: "Other update channels in form: ['<channel>':'<owner>/<repo>',...]"
+        default: "'nightly': '3dyd/yt-dlp-nightly-builds'"
+        type: string
+      allow_update:
+        description: "Allow --update to work"
+        default: true
+        type: boolean
+      python_ver:
+        description: "Python version to use from 3dyd/cpython"
+        default: 3.12.11
+        type: string
+      pyi_rebuild:
+        description: "Rebuild PyInstaller"
+        default: true
+        type: boolean
+      pyi_build_owner:
+        description: "PyInstaller build repository owner"
+        default: 3dyd
+        type: string
+      pyi_build_repo:
+        description: "PyInstaller build repository name"
+        default: pyinstaller-builds
+        type: string
+      pyi_ver:
+        description: "PyInstaller version to build"
+        default: 6.16.0
+        type: string
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  prepare:
+    name: build pyinstaller
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Rebuild custom PyInstaller
+        if: inputs.pyi_rebuild
+        uses: convictional/trigger-workflow-and-wait@v1.6.1
+        with:
+          owner: ${{ inputs.pyi_build_owner }}
+          repo: ${{ inputs.pyi_build_repo }}
+          github_token: ${{ secrets.PAT }}
+          workflow_file_name: build-package.yml
+          ref: master
+          wait_workflow: true
+          client_payload: '{"version":"${{ inputs.pyi_ver }}"}'
+
+  build:
+    name: build
+    needs: prepare
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout yt-dlp
+        uses: actions/checkout@v4
+        with:
+          repository: yt-dlp/yt-dlp
+          ref: ${{ inputs.yt_dlp_ref }}
+
+      # Verify that expected version (inputs.yt_dlp_version) matches the actual version checked out
+      - name: Verify yt-dlp Version
+        run: |
+          set -xeu
+          [[ "$CURRENT_CHANNEL" != "stable" || "$YT_DLP_REF" == "$YT_DLP_VERSION" ]]
+          version_from_git="$(git show -s --format=%cd --date=format:%Y.%m.%d)"
+          [[ "$version_from_git" == "$YT_DLP_VERSION" ]]
+        env:
+          CURRENT_CHANNEL: ${{ inputs.current_update_channel }}
+          YT_DLP_REF: ${{ inputs.yt_dlp_ref }}
+          YT_DLP_VERSION: ${{ inputs.yt_dlp_version }}
+
+      - name: Setup Python
+        run: |
+          set -xeu
+          curl -L https://github.com/3dyd/cpython/releases/download/v${PYTHON_VER}-vista/python-${PYTHON_VER}-pip+venv-win32-VISTA.zip -o .python.zip
+          unzip -q .python.zip -d .python
+          .python/python.exe -m venv .venv
+        env:
+          PYTHON_VER: ${{ inputs.python_ver }}
+
+      - name: Install Dependencies
+        run: |
+          set -xeu
+          source .venv/Scripts/activate
+          python devscripts/install_deps.py --include build
+          python -m pip install https://${PYI_BUILD_OWNER}.github.io/${PYI_BUILD_REPO}/vista/pyinstaller-${PYI_VER}-py3-none-any.whl
+        env:
+          PYI_BUILD_OWNER: ${{ inputs.pyi_build_owner }}
+          PYI_BUILD_REPO: ${{ inputs.pyi_build_repo }}
+          PYI_VER: ${{ inputs.pyi_ver }}
+
+      - name: Modify update.py
+        run: |
+          set -xeu
+
+          replace_line() {
+            # Replace line but ensure first it exists
+            grep -Fqx "$1" yt_dlp/update.py && sed -i "s|^$1\$|$2|" yt_dlp/update.py 
+          }
+
+          orig_channels=(
+            "    'stable': 'yt-dlp/yt-dlp',"
+            "    'nightly': 'yt-dlp/yt-dlp-nightly-builds',"
+            "    'master': 'yt-dlp/yt-dlp-master-builds',"
+          )
+          for c in "${orig_channels[@]}"; do
+            replace_line "$c" ""
+          done
+
+          new_spec="'$CURRENT_CHANNEL': '$GITHUB_REPOSITORY', $OTHER_CHANNELS_SPEC"
+          python -c "{$new_spec}['stable']"  # verify it has 'stable' channel
+          replace_line "UPDATE_SOURCES = {" "UPDATE_SOURCES = { $new_spec"
+
+          grep -A3 ^UPDATE_SOURCES yt_dlp/update.py
+        env:
+          CURRENT_CHANNEL: ${{ inputs.current_update_channel }}
+          OTHER_CHANNELS_SPEC: ${{ inputs.other_update_channels_spec }}
+
+      - name: Build Files
+        run: |
+          set -xeu
+          source .venv/Scripts/activate
+
+          python devscripts/make_lazy_extractors.py
+          python devscripts/update-version.py -c "$CURRENT_CHANNEL" -r "$GITHUB_REPOSITORY" "$YT_DLP_VERSION"
+
+          if [[ "$ALLOW_UPDATE" == "true" ]]; then
+            mkdir dist
+            echo "# This file is used for regulating self-update" > dist/_update_spec
+          else
+            python devscripts/set-variant.py other
+          fi
+
+          python -m bundle.pyinstaller --add-binary "c:/Program Files (x86)/Windows Kits/10/Redist/ucrt/DLLs/x86/api-ms-win-*.dll;."
+
+          (cd dist && sha256sum yt-dlp_x86.exe > SHA2-256SUMS)
+        env:
+          ALLOW_UPDATE: ${{ inputs.allow_update }}
+          CURRENT_CHANNEL: ${{ inputs.current_update_channel }}
+          YT_DLP_VERSION: ${{ inputs.yt_dlp_version }}
+
+      - name: Release Files
+        run: |
+          set -xeu
+          if gh --repo "$GITHUB_REPOSITORY" release view "$YT_DLP_VERSION" &> /dev/null; then
+            gh --repo "$GITHUB_REPOSITORY" release delete --cleanup-tag --yes "$YT_DLP_VERSION"
+            sleep 10
+          fi
+          if [[ "$CURRENT_CHANNEL" == "stable" ]]; then
+            title="yt-dlp $YT_DLP_VERSION"
+            notes="Read changelog on the official release page: [yt-dlp/yt-dlp@\`$YT_DLP_REF\`](https://github.com/yt-dlp/yt-dlp/releases/tag/$YT_DLP_REF)"
+          else
+            title="yt-dlp $CURRENT_CHANNEL $YT_DLP_VERSION"
+            notes="Generated from: [yt-dlp/yt-dlp@\`${YT_DLP_REF:0:8}\`](https://github.com/yt-dlp/yt-dlp/commit/$YT_DLP_REF)"
+          fi
+          gh --repo "$GITHUB_REPOSITORY" release create "$YT_DLP_VERSION" --target master --title "$title" --notes "$notes" dist/*
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CURRENT_CHANNEL: ${{ inputs.current_update_channel }}
+          YT_DLP_REF: ${{ inputs.yt_dlp_ref }}
+          YT_DLP_VERSION: ${{ inputs.yt_dlp_version }}
