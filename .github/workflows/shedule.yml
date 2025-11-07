@@ -39,6 +39,7 @@ jobs:
       yt_dlp_version: ${{ needs.prepare.outputs.yt_dlp_version }}
       current_update_channel: nightly
       other_update_channels_spec: "'stable': '3dyd/yt-dlp-builds'"
+      pyi_rebuild: false
     permissions:
       contents: write
       pages: write
