@@ -16,9 +16,9 @@ jobs:
       run:
         shell: bash
     outputs:
-      skip_build: ${{ steps.generate-outputs.skip_run }}
-      yt_dlp_ref: ${{ steps.generate-outputs.yt_dlp_ref }}
-      yt_dlp_version: ${{ steps.generate-outputs.yt_dlp_version }}
+      skip_build: ${{ steps.generate-outputs.outputs.skip_run }}
+      yt_dlp_ref: ${{ steps.generate-outputs.outputs.yt_dlp_ref }}
+      yt_dlp_version: ${{ steps.generate-outputs.outputs.yt_dlp_version }}
 
     steps:
       - name: Generate Outputs
