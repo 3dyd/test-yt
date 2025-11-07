@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       yt_dlp_ref:
-        description: "yt-dlp ref to checkout: tag YYYY.MM.DD for stable channel or hash otherwise"
+        description: "yt-dlp ref to checkout: tag YYYY.MM.DD for stable channel or hash for other channels"
         required: true
         type: string
       yt_dlp_version:
