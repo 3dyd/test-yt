@@ -39,8 +39,8 @@ jobs:
         run: |
           set -xeu
 
-          commit_date="$(TZ=UTC git log -1 --format=%cd --date=format-local:'%Y.%m.%d')"
-          current_date="${YT_DLP_VERSION:-$(TZ=UTC date +"%Y.%m.%d")}"
+          commit_date="$(TZ=UTC git log -1 --format=%cd --date=format-local:%Y.%m.%d)"
+          current_date="${YT_DLP_VERSION:-$(TZ=UTC date +%Y.%m.%d)}"
           skip_build="false"
           [[ "$commit_date" == "$current_date" ]] || skip_build="true"
 
